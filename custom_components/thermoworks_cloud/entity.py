@@ -15,11 +15,11 @@ Ids are set in these base classes, never by the sub-classes:
 
 - `unique_id`, `{DOMAIN}-{ha_device_identifier}-{suffix}`: the entity registry's key.
   Changing it orphans the entity, so existing formats can't change.
-- `entity_id`, `{platform}.{device_key}_{suffix}`: only suggested when the entity is created.
-  Home Assistant adds `_2` if it's taken, and users can rename it.
+- `entity_id`: left to Home Assistant, which builds it from the device name and the entity
+  name when the entity is created, like `sensor.rfx_probe_red_sensor_2_temperature`. Existing
+  entities keep the id they were created with.
 
-A class whose ids were created in another format overrides `_unique_id` or
-`_suggested_object_id`.
+A class whose unique ids were created in another format overrides `_unique_id`.
 """
 
 from abc import abstractmethod
@@ -27,9 +27,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import ClassVar, Protocol, Self
 
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -92,14 +91,11 @@ class ThermoworksEntity[S: Source, R, D = None](CoordinatorEntity[ThermoworksCoo
     """Base class for all entities of Thermoworks devices. Parses a view from its source on 
     every update."""
 
-    # Set by each platform's base class, e.g. "sensor.{}"
-    entity_id_format: ClassVar[str]
     # Appended to both ids of the entity. The entity id is generated as a slug, so "last-seen" becomes "last_seen".
     suffix: ClassVar[str]
 
     def __init__(
         self,
-        hass: HomeAssistant,
         coordinator: ThermoworksCoordinator,
         source: S,
         view: View[R, D],
@@ -112,20 +108,17 @@ class ThermoworksEntity[S: Source, R, D = None](CoordinatorEntity[ThermoworksCoo
         self._device_key = source.device_key
         self._ha_device_identifier = source.ha_device_identifier
         self._attr_unique_id = self._unique_id()
-        self.entity_id = async_generate_entity_id(
-            self.entity_id_format, self._suggested_object_id(), hass=hass
-        )
         self._update_from(view)
 
     @classmethod
     def build(
-        cls, hass: HomeAssistant, coordinator: ThermoworksCoordinator, source: S
+        cls, coordinator: ThermoworksCoordinator, source: S
     ) -> Self | None:
         """Create the entity for a source, or None if it doesn't apply."""
         view = cls.parse(source)
         if view is None:
             return None
-        return cls(hass, coordinator, source, view)
+        return cls(coordinator, source, view)
 
     @classmethod
     @abstractmethod
@@ -149,14 +142,6 @@ class ThermoworksEntity[S: Source, R, D = None](CoordinatorEntity[ThermoworksCoo
         if it does but has no current reading.
         """
 
-    def _suggested_object_id(self) -> str:
-        """Return the object id to suggest for use in the entity id, e.g. "abc123_last_seen".
-
-        Entity ids have always started with the device key, not the `ha_device_identifier`.
-        New entities keep that pattern so they match the existing ones on a device. Changing
-        it wouldn't affect existing entities, since the registry keeps their ids.
-        """
-        return f"{self._device_key}_{self.suffix}"
 
     def _unique_id(self) -> str:
         """Return the unique id of the entity."""
@@ -240,7 +225,6 @@ class ThermoworksChannelEntity[R, D: ChannelDescription = ChannelDescription](
 
     def __init__(
         self,
-        hass: HomeAssistant,
         coordinator: ThermoworksCoordinator,
         source: ThermoworksChannel,
         view: View[R, D],
@@ -248,7 +232,7 @@ class ThermoworksChannelEntity[R, D: ChannelDescription = ChannelDescription](
         """Initialise the entity, remembering which channel it reads."""
         # Before super().__init__, which builds the ids from it
         self._channel_number = source.number
-        super().__init__(hass, coordinator, source, view)
+        super().__init__(coordinator, source, view)
 
     @classmethod
     def sources(cls, device: ThermoworksDevice) -> Iterable[ThermoworksChannel]:
@@ -257,8 +241,6 @@ class ThermoworksChannelEntity[R, D: ChannelDescription = ChannelDescription](
     def _select(self, device: ThermoworksDevice) -> ThermoworksChannel | None:
         return device.channels.get(self._channel_number)
 
-    def _suggested_object_id(self) -> str:
-        return f"{self._device_key}_ch_{self._channel_number}_{self.suffix}"
 
     def _unique_id(self) -> str:
         # Without the "ch" the object id has, as channel unique ids were initially
@@ -276,7 +258,3 @@ class ThermoworksFanEntity[R, D = None](ThermoworksEntity[ThermoworksFan, R, D])
     def _select(self, device: ThermoworksDevice) -> ThermoworksFan | None:
         return device.fan
 
-    def _suggested_object_id(self) -> str:
-        # The device key is the gateway's device key. The default unique id needs no 
-        # "fan", since the fan's `ha_device_identifier` already ends in "-fan".
-        return f"{self._device_key}_fan_{self.suffix}"

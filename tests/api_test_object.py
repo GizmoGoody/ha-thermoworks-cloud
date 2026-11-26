@@ -202,3 +202,22 @@ GET_DEVICES_FAN_NO_DISPLAY_UNITS_RESPONSE = deepcopy(GET_DEVICES_FAN_RESPONSE)
 GET_DEVICES_FAN_NO_DISPLAY_UNITS_RESPONSE["devices"][0]["displayUnits"] = None
 GET_DEVICES_FAN_DISCONNECTED_RESPONSE = deepcopy(GET_DEVICES_FAN_RESPONSE)
 GET_DEVICES_FAN_DISCONNECTED_RESPONSE["devices"][0]["fan"]["connected"] = False
+# An RFX MEAT probe: a computed channel for the probe, with its alarms on, and sensors along
+# the probe with no labels and alarms the ThermoWorks app cannot set
+GET_DEVICES_RFX_MEAT_RESPONSE = deepcopy(GET_DEVICES_RESPONSE)
+GET_DEVICES_RFX_MEAT_RESPONSE["devices"][0].update(
+    {"model": "rfx meat", "type": "rfx", "label": "RFX Probe Red"}
+)
+_channel = GET_DEVICES_RFX_MEAT_RESPONSE["devices"][0]["channels"][0]
+_alarm_off = {"enabled": False, "value": 165, "alarming": False}
+GET_DEVICES_RFX_MEAT_RESPONSE["devices"][0]["channels"] = [
+    {**_channel, "number": 0, "id": "0", "label": "PROBE", "type": "computed"},
+    *(
+        {
+            **_channel, "number": number, "id": str(number), "label": None,
+            "type": "rfx meat sensor", "alarmHigh": _alarm_off,
+            "alarmLow": {**_alarm_off, "value": 32},
+        }
+        for number in range(1, 5)
+    ),
+]

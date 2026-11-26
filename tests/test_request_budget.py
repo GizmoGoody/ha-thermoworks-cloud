@@ -31,7 +31,7 @@ REQUESTS_RESET = "sensor.thermoworks_cloud_requests_reset"
 REQUESTS_EXHAUSTED = "sensor.thermoworks_cloud_requests_exhausted"
 SUSTAINABLE_INTERVAL = "sensor.thermoworks_cloud_sustainable_interval"
 RATE_LIMITED = "binary_sensor.thermoworks_cloud_rate_limited"
-TEMPERATURE_ENTITY = "sensor.12_34_56_78_90_ab_ch_1_temperature"
+TEMPERATURE_ENTITY = "sensor.kitchen_freezer_temperature"
 
 
 def _api_key_entry(hass: HomeAssistant) -> MockConfigEntry:

@@ -12,7 +12,6 @@ import logging
 from typing import Any
 
 from homeassistant.components.sensor import (
-    ENTITY_ID_FORMAT,
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
@@ -101,7 +100,7 @@ async def async_setup_entry(
         # SENSORS is at the end of the file, after the classes it lists
         for sensor in SENSORS:
             for source in sensor.sources(device):
-                entity = sensor.build(hass, coordinator, source)
+                entity = sensor.build(coordinator, source)
                 if entity is None:
                     _LOGGER.debug("Not creating %s sensor for device %s",
                                   sensor.suffix, device.display_name())
@@ -126,7 +125,6 @@ async def async_setup_entry(
 class DeviceSensor[R](ThermoworksDeviceEntity[R], SensorEntity):
     """Base class for sensors on the device itself."""
 
-    entity_id_format = ENTITY_ID_FORMAT
 
     _attr_has_entity_name = True
 
@@ -261,7 +259,6 @@ class FanSensor[R, D = None](ThermoworksFanEntity[R, D], SensorEntity):
     fan still reports its last state and set temperature, which aren't current.
     """
 
-    entity_id_format = ENTITY_ID_FORMAT
 
     _attr_has_entity_name = True
 
@@ -349,7 +346,6 @@ class ChannelSensor[R, D: ChannelDescription = ChannelDescription](
 ):
     """Base class for thermoworks channel sensors."""
 
-    entity_id_format = ENTITY_ID_FORMAT
 
     # https://developers.home-assistant.io/docs/core/entity/sensor/#available-state-classes
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -360,8 +356,7 @@ class ChannelSensor[R, D: ChannelDescription = ChannelDescription](
     _attr_suggested_display_precision = 1
 
     def _describe(self, description: D) -> None:
-        # Named after the channel, not the device
-        self._attr_name = description.name.capitalize()
+        # Named after the channel, through each sensor's translation key
         self._attr_translation_placeholders = {"channel_name": description.name}
 
 
@@ -413,7 +408,7 @@ class MeasurementSensor(ChannelSensor[Measurement, MeasurementDescription]):
         return View(
             entity_state=measurement,
             description=MeasurementDescription(
-                name=channel.display_name(), unit=HA_UNITS[channel.units]
+                name=channel.entity_name, unit=HA_UNITS[channel.units]
             ),
         )
 
@@ -467,9 +462,12 @@ class AlarmThreshold:
 
 @dataclass(frozen=True)
 class AlarmThresholdDescription(ChannelDescription):
-    """A channel's name, and the unit its alarm threshold is in."""
+    """A channel's name, the unit its alarm threshold is in, and whether the alarm is on."""
 
     unit: str
+    # An alarm that is off when the entity is created starts disabled. The ThermoWorks app
+    # cannot set the alarms of some channels, such as the sensors along an RFX MEAT probe.
+    enabled_by_default: bool
 
 
 class AlarmThresholdSensor(ChannelSensor[AlarmThreshold, AlarmThresholdDescription]):
@@ -503,12 +501,16 @@ class AlarmThresholdSensor(ChannelSensor[AlarmThreshold, AlarmThresholdDescripti
         return View(
             entity_state=AlarmThreshold(alarm.value, alarm.enabled, alarm.alarming),
             description=AlarmThresholdDescription(
-                name=channel.display_name(), unit=HA_UNITS[units]
+                name=channel.entity_name,
+                unit=HA_UNITS[units],
+                enabled_by_default=alarm.enabled is True,
             ),
         )
 
     def _describe(self, description: AlarmThresholdDescription) -> None:
         super()._describe(description)
+        # Only read when the entity is first registered
+        self._attr_entity_registry_enabled_default = description.enabled_by_default
         self._attr_native_unit_of_measurement = description.unit
         self._attr_device_class = (
             SensorDeviceClass.HUMIDITY
@@ -535,10 +537,6 @@ class HighAlarmThresholdSensor(AlarmThresholdSensor):
     def _alarm(cls, channel: ThermoworksChannel) -> ThermoworksAlarm | None:
         return channel.alarm_high
 
-    def _describe(self, description: AlarmThresholdDescription) -> None:
-        super()._describe(description)
-        self._attr_name = f"{description.name} High Alarm Threshold"
-
 
 class LowAlarmThresholdSensor(AlarmThresholdSensor):
     """The channel's low alarm threshold."""
@@ -550,10 +548,6 @@ class LowAlarmThresholdSensor(AlarmThresholdSensor):
     @classmethod
     def _alarm(cls, channel: ThermoworksChannel) -> ThermoworksAlarm | None:
         return channel.alarm_low
-
-    def _describe(self, description: AlarmThresholdDescription) -> None:
-        super()._describe(description)
-        self._attr_name = f"{description.name} Low Alarm Threshold"
 
 
 # Every sensor type. Each is created for the sources on a device that have it.

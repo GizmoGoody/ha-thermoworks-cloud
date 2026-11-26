@@ -38,10 +38,10 @@
         "name": "Connected"
       },
       "high_alarm": {
-        "name": "High Alarm"
+        "name": "{channel_name} high alarm"
       },
       "low_alarm": {
-        "name": "Low Alarm"
+        "name": "{channel_name} low alarm"
       },
       "rate_limited": {
         "name": "Rate limited",
@@ -59,7 +59,7 @@
     },
     "sensor": {
       "battery": {
-        "name": "[%key:component::sensor::entity_component::signal::name%]"
+        "name": "[%key:component::sensor::entity_component::battery::name%]"
       },
       "last_seen": {
         "name": "Last Seen"
@@ -68,10 +68,10 @@
         "name": "Transmit Interval"
       },
       "temperature": {
-        "name": "{channel_name} Temperature"
+        "name": "{channel_name} temperature"
       },
       "humidity": {
-        "name": "{channel_name} Humidity"
+        "name": "{channel_name} humidity"
       },
       "signal": {
         "name": "[%key:component::sensor::entity_component::signal_strength::name%]"
@@ -83,10 +83,10 @@
         "name": "Set Temperature"
       },
       "high_alarm_threshold": {
-        "name": "High Alarm Threshold"
+        "name": "{channel_name} high alarm threshold"
       },
       "low_alarm_threshold": {
-        "name": "Low Alarm Threshold"
+        "name": "{channel_name} low alarm threshold"
       },
       "requests_today": {
         "name": "Requests today"

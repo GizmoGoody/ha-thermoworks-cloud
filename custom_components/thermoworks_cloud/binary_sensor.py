@@ -4,7 +4,6 @@ from abc import abstractmethod
 from dataclasses import dataclass
 
 from homeassistant.components.binary_sensor import (
-    ENTITY_ID_FORMAT,
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
@@ -36,7 +35,7 @@ async def async_setup_entry(
         # BINARY_SENSORS is at the end of the file, after the classes it lists
         for binary_sensor in BINARY_SENSORS:
             for source in binary_sensor.sources(device):
-                entity = binary_sensor.build(hass, coordinator, source)
+                entity = binary_sensor.build(coordinator, source)
                 if entity is not None:
                     new_entities.append(entity)
 
@@ -94,7 +93,6 @@ class FanConnectedSensor(ThermoworksFanEntity[FanConnection], BinarySensorEntity
     showing that is its job.
     """
 
-    entity_id_format = ENTITY_ID_FORMAT
     suffix = "connected"
 
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
@@ -119,14 +117,24 @@ class AlarmState:
     units: Unit | None
 
 
-class AlarmBinarySensor(ThermoworksChannelEntity[AlarmState], BinarySensorEntity):
+@dataclass(frozen=True)
+class AlarmDescription(ChannelDescription):
+    """A channel's name, and whether the alarm is on."""
+
+    # An alarm that is off when the entity is created starts disabled. The ThermoWorks app
+    # cannot set the alarms of some channels, such as the sensors along an RFX MEAT probe.
+    enabled_by_default: bool
+
+
+class AlarmBinarySensor(
+    ThermoworksChannelEntity[AlarmState, AlarmDescription], BinarySensorEntity
+):
     """Base class for Thermoworks channel alarm binary sensors.
 
     Created when the channel has the alarm, but only available while the channel has a
     valid reading. Without one, the alarm's state is an old evaluation, not a current one.
     """
 
-    entity_id_format = ENTITY_ID_FORMAT
 
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_has_entity_name = True
@@ -137,11 +145,13 @@ class AlarmBinarySensor(ThermoworksChannelEntity[AlarmState], BinarySensorEntity
         """Return the alarm this sensor shows."""
 
     @classmethod
-    def parse(cls, channel: ThermoworksChannel) -> View[AlarmState, ChannelDescription] | None:
+    def parse(cls, channel: ThermoworksChannel) -> View[AlarmState, AlarmDescription] | None:
         alarm = cls._alarm(channel)
         if alarm is None:
             return None
-        description = ChannelDescription(name=channel.display_name())
+        description = AlarmDescription(
+            name=channel.entity_name, enabled_by_default=alarm.enabled is True
+        )
         if channel.reading is None:
             return View(entity_state=None, description=description)
         return View(
@@ -153,6 +163,12 @@ class AlarmBinarySensor(ThermoworksChannelEntity[AlarmState], BinarySensorEntity
             ),
             description=description,
         )
+
+    def _describe(self, description: AlarmDescription) -> None:
+        # Named after the channel, through each sensor's translation key
+        self._attr_translation_placeholders = {"channel_name": description.name}
+        # Only read when the entity is first registered
+        self._attr_entity_registry_enabled_default = description.enabled_by_default
 
     def _apply(self, entity_state: AlarmState) -> None:
         self._attr_is_on = entity_state.active
@@ -174,9 +190,6 @@ class HighAlarmBinarySensor(AlarmBinarySensor):
     def _alarm(cls, channel: ThermoworksChannel) -> ThermoworksAlarm | None:
         return channel.alarm_high
 
-    def _describe(self, description: ChannelDescription) -> None:
-        self._attr_name = f"{description.name} High Alarm"
-
 
 class LowAlarmBinarySensor(AlarmBinarySensor):
     """Whether the channel's low alarm is going off."""
@@ -188,9 +201,6 @@ class LowAlarmBinarySensor(AlarmBinarySensor):
     @classmethod
     def _alarm(cls, channel: ThermoworksChannel) -> ThermoworksAlarm | None:
         return channel.alarm_low
-
-    def _describe(self, description: ChannelDescription) -> None:
-        self._attr_name = f"{description.name} Low Alarm"
 
 
 # Every binary sensor type. Each is created for the sources on a device that have it.
