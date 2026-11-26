@@ -757,6 +757,40 @@ async def test_charging_battery_uses_the_charging_icon(
     assert state.attributes.get("icon") == "mdi:battery-charging-100"
 
 
+@pytest.mark.parametrize(
+    ("response", "expected"),
+    [
+        pytest.param(GET_DEVICES_CHARGING_RESPONSE, "on", id="charging"),
+        pytest.param(GET_DEVICES_RESPONSE, "off", id="discharging"),
+    ],
+)
+async def test_charging_sensor_shows_the_battery_state(
+    hass: HomeAssistant,
+    api_test_object: ApiTestObject,
+    response: dict[str, Any],
+    expected: str,
+) -> None:
+    """The battery state from the API is a Charging binary sensor, for automations."""
+
+    # Setup
+    entry = _api_key_entry(hass)
+    api_test_object.respond_to_devices(body=response)
+
+    # Act
+    await _set_up(hass, entry)
+
+    # Assert
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{DOMAIN}-{dr.format_mac(TEST_SERIAL)}-charging"
+    )
+    assert entity_id is not None
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == expected
+    assert state.attributes.get("device_class") == "battery_charging"
+    assert state.attributes.get("friendly_name") == "Kitchen Charging"
+
+
 async def test_lost_device_field_only_affects_its_entity(
     hass: HomeAssistant,
     api_test_object: ApiTestObject,
