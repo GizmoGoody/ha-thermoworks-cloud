@@ -1024,10 +1024,10 @@ async def test_channel_entities_are_named_after_their_channel(
             "PORK Shoulder high alarm threshold",
         "binary_sensor.kitchen_pork_shoulder_high_alarm": "PORK Shoulder high alarm",
         # A missing or empty label falls back to the channel number
-        "sensor.kitchen_channel_3_temperature": "Channel 3 temperature",
-        "sensor.kitchen_channel_4_temperature": "Channel 4 temperature",
-        "sensor.kitchen_channel_3_high_alarm_threshold": "Channel 3 high alarm threshold",
-        "binary_sensor.kitchen_channel_4_high_alarm": "Channel 4 high alarm",
+        "sensor.kitchen_ch3_temperature": "Ch3 temperature",
+        "sensor.kitchen_ch4_temperature": "Ch4 temperature",
+        "sensor.kitchen_ch3_high_alarm_threshold": "Ch3 high alarm threshold",
+        "binary_sensor.kitchen_ch4_high_alarm": "Ch4 high alarm",
     }
 
     # Act
@@ -1242,7 +1242,7 @@ async def test_rfx_meat_channels_are_named_and_unset_alarms_start_disabled(
     # Assert
     for entity_id, name in {
         "sensor.rfx_probe_red_probe_temperature": "RFX Probe Red Probe temperature",
-        "sensor.rfx_probe_red_sensor_2_temperature": "RFX Probe Red Sensor 2 temperature",
+        "sensor.rfx_probe_red_ch2_temperature": "RFX Probe Red Ch2 temperature",
         "binary_sensor.rfx_probe_red_probe_high_alarm": "RFX Probe Red Probe high alarm",
     }.items():
         state = hass.states.get(entity_id)
@@ -1252,8 +1252,8 @@ async def test_rfx_meat_channels_are_named_and_unset_alarms_start_disabled(
     for entity_id, disabled in {
         "binary_sensor.rfx_probe_red_probe_high_alarm": False,
         "sensor.rfx_probe_red_probe_low_alarm_threshold": False,
-        "binary_sensor.rfx_probe_red_sensor_2_high_alarm": True,
-        "sensor.rfx_probe_red_sensor_2_low_alarm_threshold": True,
+        "binary_sensor.rfx_probe_red_ch2_high_alarm": True,
+        "sensor.rfx_probe_red_ch2_low_alarm_threshold": True,
     }.items():
         registry_entry = registry.async_get(entity_id)
         assert registry_entry is not None, entity_id
