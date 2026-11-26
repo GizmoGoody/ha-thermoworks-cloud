@@ -905,7 +905,12 @@ async def test_fan_is_registered_under_its_gateway(
     fan = _registered_device(hass, entry, f"{dr.format_mac(TEST_SERIAL)}-fan")
     assert fan.name == fan_name
     assert fan.via_device_id == gateway.id
-    fan_state = hass.states.get("sensor.kitchen_fan_state")
+    # The unlabeled gateway's entity id is not named after Kitchen
+    fan_state_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{DOMAIN}-{dr.format_mac(TEST_SERIAL)}-fan-state"
+    )
+    assert fan_state_id is not None
+    fan_state = hass.states.get(fan_state_id)
     assert fan_state is not None
     assert fan_state.state == "Blowing"
 
