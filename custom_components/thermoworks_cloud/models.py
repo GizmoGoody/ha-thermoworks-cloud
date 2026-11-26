@@ -144,6 +144,8 @@ class ThermoworksChannel:
     reading: float | None
     status: str | None = None
     label: str | None = None
+    # What the channel is, for example "computed" or "rfx meat sensor"
+    channel_type: str | None = None
     alarm_high: ThermoworksAlarm | None = None
     alarm_low: ThermoworksAlarm | None = None
     id: str | None = None
@@ -173,6 +175,7 @@ class ThermoworksChannel:
             reading=_valid_reading(channel),
             status=channel.status,
             label=channel.label,
+            channel_type=channel.type,
             alarm_high=ThermoworksAlarm.from_api_alarm(channel.alarm_high),
             alarm_low=ThermoworksAlarm.from_api_alarm(channel.alarm_low),
             id=channel.id,
@@ -187,6 +190,22 @@ class ThermoworksChannel:
         """Return the display name of the channel."""
         # {user given name} (Ch. {channel number})
         return f"{self.label or "unnamed channel"} (Ch. {self.number})"
+
+    @property
+    def entity_name(self) -> str:
+        """Return the name the channel's entities are named after, such as "Sensor 2".
+
+        The ThermoWorks app cannot name every channel, so a channel without a label is named
+        after what it is. An RFX MEAT probe's computed channel is the probe's reading (labelled
+        "PROBE" or not at all), and its other channels are the sensors along the probe.
+        """
+        if self.channel_type == "computed":
+            return "Probe"
+        if self.label:
+            return self.label
+        if self.channel_type == "rfx meat sensor":
+            return f"Sensor {self.number}"
+        return f"Channel {self.number}"
 
 
 @dataclass(frozen=True)

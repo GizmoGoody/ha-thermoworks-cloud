@@ -53,6 +53,7 @@ from tests.api_test_object import (
     GET_DEVICES_UNKNOWN_CHANNEL_METADATA_RESPONSE,
     GET_DEVICES_DISTINCT_CHANNEL_ID_RESPONSE,
     GET_DEVICES_LOW_ALARM_RESPONSE,
+    GET_DEVICES_RFX_MEAT_RESPONSE,
     TEST_ACCOUNT_ID,
     TEST_API_KEY,
     TEST_ETAG,
@@ -1011,17 +1012,17 @@ async def test_channel_entities_are_named_after_their_channel(
     entry = _api_key_entry(hass)
     api_test_object.respond_to_devices(body=GET_DEVICES_NAMING_RESPONSE)
     expected = {
-        # Measurement names are capitalized, the alarm names keep the label as it is
-        "sensor.12_34_56_78_90_ab_ch_1_temperature": "Pork shoulder (ch. 1)",
-        "sensor.12_34_56_78_90_ab_ch_2_humidity": "Dry box (ch. 2)",
+        # A label is used as it is
+        "sensor.12_34_56_78_90_ab_ch_1_temperature": "PORK Shoulder temperature",
+        "sensor.12_34_56_78_90_ab_ch_2_humidity": "dry box humidity",
         "sensor.12_34_56_78_90_ab_ch_1_high_alarm_threshold":
-            "PORK Shoulder (Ch. 1) High Alarm Threshold",
-        "binary_sensor.12_34_56_78_90_ab_ch_1_high_alarm": "PORK Shoulder (Ch. 1) High Alarm",
-        "sensor.12_34_56_78_90_ab_ch_3_temperature": "Unnamed channel (ch. 3)",
-        "sensor.12_34_56_78_90_ab_ch_4_temperature": "Unnamed channel (ch. 4)",
-        "sensor.12_34_56_78_90_ab_ch_3_high_alarm_threshold":
-            "unnamed channel (Ch. 3) High Alarm Threshold",
-        "binary_sensor.12_34_56_78_90_ab_ch_4_high_alarm": "unnamed channel (Ch. 4) High Alarm",
+            "PORK Shoulder high alarm threshold",
+        "binary_sensor.12_34_56_78_90_ab_ch_1_high_alarm": "PORK Shoulder high alarm",
+        # A missing or empty label falls back to the channel number
+        "sensor.12_34_56_78_90_ab_ch_3_temperature": "Channel 3 temperature",
+        "sensor.12_34_56_78_90_ab_ch_4_temperature": "Channel 4 temperature",
+        "sensor.12_34_56_78_90_ab_ch_3_high_alarm_threshold": "Channel 3 high alarm threshold",
+        "binary_sensor.12_34_56_78_90_ab_ch_4_high_alarm": "Channel 4 high alarm",
     }
 
     # Act
@@ -1218,3 +1219,36 @@ async def test_disconnected_fan_values_are_unavailable(
         assert state is not None, entity_id
         assert state.state == "unavailable", entity_id
 
+
+
+async def test_rfx_meat_channels_are_named_and_unset_alarms_start_disabled(
+    hass: HomeAssistant, api_test_object: ApiTestObject
+) -> None:
+    """Test RFX MEAT channel names, and that alarms that are off start disabled."""
+
+    # Setup
+    entry = _api_key_entry(hass)
+    api_test_object.respond_to_devices(body=GET_DEVICES_RFX_MEAT_RESPONSE)
+
+    # Act
+    await _set_up(hass, entry)
+
+    # Assert
+    for entity_id, name in {
+        "sensor.12_34_56_78_90_ab_ch_0_temperature": "RFX Probe Red Probe temperature",
+        "sensor.12_34_56_78_90_ab_ch_2_temperature": "RFX Probe Red Sensor 2 temperature",
+        "binary_sensor.12_34_56_78_90_ab_ch_0_high_alarm": "RFX Probe Red Probe high alarm",
+    }.items():
+        state = hass.states.get(entity_id)
+        assert state is not None, entity_id
+        assert state.attributes["friendly_name"] == name, entity_id
+    registry = er.async_get(hass)
+    for entity_id, disabled in {
+        "binary_sensor.12_34_56_78_90_ab_ch_0_high_alarm": False,
+        "sensor.12_34_56_78_90_ab_ch_0_low_alarm_threshold": False,
+        "binary_sensor.12_34_56_78_90_ab_ch_2_high_alarm": True,
+        "sensor.12_34_56_78_90_ab_ch_2_low_alarm_threshold": True,
+    }.items():
+        registry_entry = registry.async_get(entity_id)
+        assert registry_entry is not None, entity_id
+        assert (registry_entry.disabled_by is not None) == disabled, entity_id
