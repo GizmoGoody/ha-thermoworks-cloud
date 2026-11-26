@@ -22,10 +22,11 @@ from pytest_homeassistant_custom_component.common import (
 from custom_components.thermoworks_cloud.const import (
     CONF_API_KEY,
     CONF_CLOUD_PROVIDER,
-    DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
+    ETI_DEFAULT_SCAN_INTERVAL_SECONDS,
     PROVIDER_ETI,
     PROVIDER_THERMOWORKS,
+    THERMOWORKS_DEFAULT_SCAN_INTERVAL_SECONDS,
 )
 from tests.api_test_object import (
     GET_DEVICES_RESPONSE,
@@ -81,7 +82,11 @@ async def _set_up(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     await hass.async_block_till_done()
 
 
-async def _poll(hass: HomeAssistant, seconds: int = DEFAULT_SCAN_INTERVAL_SECONDS) -> None:
+# Longer than every provider's default scan interval
+POLL_SECONDS = ETI_DEFAULT_SCAN_INTERVAL_SECONDS
+
+
+async def _poll(hass: HomeAssistant, seconds: int = POLL_SECONDS) -> None:
     """Advance time far enough for the integration to poll again."""
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=seconds + 1))
     await hass.async_block_till_done(wait_background_tasks=True)
@@ -220,6 +225,24 @@ async def test_rate_limit_delays_the_next_poll(
 
     # Assert
     assert len(api_test_object.devices_requests) == requests_when_limited
+
+
+async def test_api_key_entry_polls_every_30_seconds_by_default(
+    hass: HomeAssistant, api_test_object: ApiTestObject
+) -> None:
+    """Test that a ThermoWorks entry without a saved scan interval polls every 30 seconds."""
+
+    # Setup
+    entry = _api_key_entry(hass)
+    await _set_up(hass, entry)
+    requests_after_setup = len(api_test_object.devices_requests)
+
+    # Act
+    await _poll(hass, THERMOWORKS_DEFAULT_SCAN_INTERVAL_SECONDS)
+
+    # Assert
+    assert THERMOWORKS_DEFAULT_SCAN_INTERVAL_SECONDS == 30
+    assert len(api_test_object.devices_requests) == requests_after_setup + 1
 
 
 async def test_rejected_key_asks_for_a_new_key(
@@ -523,7 +546,7 @@ async def test_failed_channel_becomes_unavailable_and_recovers(
 
     # Recover using the same entities and identifiers.
     api_test_object.respond_to_devices(body=GET_DEVICES_RESPONSE)
-    await _poll(hass, DEFAULT_SCAN_INTERVAL_SECONDS * 2)
+    await _poll(hass, POLL_SECONDS * 2)
     recovered = hass.states.get(TEMPERATURE_ENTITY)
     assert recovered is not None
     assert float(recovered.state) == GET_DEVICES_RESPONSE["devices"][0]["channels"][0]["value"]
@@ -565,7 +588,7 @@ async def test_missing_channel_becomes_unavailable_and_recovers(
 
     # Recover using the same entities.
     api_test_object.respond_to_devices(body=GET_DEVICES_RESPONSE)
-    await _poll(hass, DEFAULT_SCAN_INTERVAL_SECONDS * 2)
+    await _poll(hass, POLL_SECONDS * 2)
     recovered = hass.states.get(TEMPERATURE_ENTITY)
     assert recovered is not None
     assert float(recovered.state) == GET_DEVICES_RESPONSE["devices"][0]["channels"][0]["value"]

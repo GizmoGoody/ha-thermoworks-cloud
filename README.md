@@ -22,7 +22,8 @@ Copy the [custom_components/thermoworks_cloud](custom_components/) folder into t
 1. With this custom component installed into your HA instance, you will now see the ThermoWorks Cloud integration available as an integration that can be added (settings > Devices & services > Add Integration)
 1. For ThermoWorks Cloud, create an API key under **Settings → Account Settings → Integrations** in the ThermoWorks Cloud web app, then enter it during setup. Existing entries will request a key through reauthentication. ETI Cloud continues to use email and password.
 1. After adding the integration, you will be required to set the [scan interval](#controlling-the-scan-interval) which will tell HA how often to request new data from ThermoWorks. This can be changed later.  
-    * The default is 1,800 seconds (30 minutes), however this may be too slow for real-time applications like grilling with RFX
+    * For ThermoWorks Cloud the default is 30 seconds. Each poll is one request, and polling every 30 seconds uses 2,880 requests a day, within the free plan's limit of 3,000 a day. The shortest interval is 15 seconds, because ThermoWorks caches its answers for 15 seconds.
+    * For ETI Cloud the default stays at 1,800 seconds (30 minutes).
 
 ### Controlling the Scan Interval
 It may be desirable to change the scan interval based on the activity that the devices is being used for. There are two ways to change it:

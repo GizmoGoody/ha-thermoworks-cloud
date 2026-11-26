@@ -25,13 +25,13 @@ from .const import (
     CLOUD_PROVIDERS,
     CONF_API_KEY,
     CONF_CLOUD_PROVIDER,
-    DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     MAX_SCAN_INTERVAL_SECONDS,
     MIN_SCAN_INTERVAL_SECONDS,
     PROVIDER_ETI,
     PROVIDER_THERMOWORKS,
 )
+from .helpers import get_scan_interval
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
@@ -235,9 +235,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             {
                 vol.Required(
                     CONF_SCAN_INTERVAL,
-                    default=self.config_entry.options.get(
-                        CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
-                    ),
+                    default=get_scan_interval(self.config_entry),
                 ): vol.All(
                     vol.Coerce(int),
                     vol.Clamp(

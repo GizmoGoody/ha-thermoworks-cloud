@@ -4,21 +4,30 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
 from homeassistant.components.number import NumberDeviceClass
 from homeassistant.const import CONF_SCAN_INTERVAL, EntityCategory, UnitOfTime
 from homeassistant.helpers.device_registry import DeviceEntryType
 
 from custom_components.thermoworks_cloud.const import (
-    DEFAULT_SCAN_INTERVAL_SECONDS,
+    CONF_CLOUD_PROVIDER,
     DOMAIN,
+    ETI_DEFAULT_SCAN_INTERVAL_SECONDS,
     MAX_SCAN_INTERVAL_SECONDS,
     MIN_SCAN_INTERVAL_SECONDS,
+    PROVIDER_ETI,
+    PROVIDER_THERMOWORKS,
+    THERMOWORKS_DEFAULT_SCAN_INTERVAL_SECONDS,
 )
 from custom_components.thermoworks_cloud.config_flow import OptionsFlowHandler
 from custom_components.thermoworks_cloud.number import ScanIntervalNumber
 
 
-def _build_entity(options: dict | None = None):
+THERMOWORKS_DATA = {CONF_CLOUD_PROVIDER: PROVIDER_THERMOWORKS}
+
+
+def _build_entity(options: dict | None = None, data: dict | None = None):
     """Return ``(entity, updates)`` with fake hass / config entry wiring.
 
     ``updates`` collects the options dicts handed to ``async_update_entry`` so a
@@ -28,6 +37,7 @@ def _build_entity(options: dict | None = None):
     config_entry = SimpleNamespace(
         entry_id="entry123",
         title="ThermoWorks Cloud",
+        data=THERMOWORKS_DATA if data is None else data,
         options=dict(options or {}),
     )
 
@@ -67,10 +77,19 @@ def test_bound_to_config_entry_service_device() -> None:
     assert "model" not in device_info
 
 
-def test_native_value_defaults_when_option_unset() -> None:
-    """With no stored option the entity reports the package default."""
-    entity, _ = _build_entity()
-    assert entity.native_value == DEFAULT_SCAN_INTERVAL_SECONDS
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        (THERMOWORKS_DATA, THERMOWORKS_DEFAULT_SCAN_INTERVAL_SECONDS),
+        ({CONF_CLOUD_PROVIDER: PROVIDER_ETI}, ETI_DEFAULT_SCAN_INTERVAL_SECONDS),
+        # Entries saved before providers existed are ThermoWorks Cloud entries
+        ({}, THERMOWORKS_DEFAULT_SCAN_INTERVAL_SECONDS),
+    ],
+)
+def test_native_value_defaults_when_option_unset(data: dict, expected: int) -> None:
+    """With no stored option the entity reports its provider's default."""
+    entity, _ = _build_entity(data=data)
+    assert entity.native_value == expected
 
 
 def test_native_value_reads_from_options_store() -> None:
@@ -122,7 +141,7 @@ def test_set_value_no_op_when_option_unset_and_value_is_default() -> None:
     must not write options (and so must not reload the entry)."""
     entity, updates = _build_entity()
 
-    asyncio.run(entity.async_set_native_value(DEFAULT_SCAN_INTERVAL_SECONDS))
+    asyncio.run(entity.async_set_native_value(THERMOWORKS_DEFAULT_SCAN_INTERVAL_SECONDS))
 
     assert updates == []
 
@@ -148,7 +167,7 @@ def _options_schema(options: dict):
         patch.object(
             OptionsFlowHandler,
             "config_entry",
-            SimpleNamespace(options=dict(options)),
+            SimpleNamespace(data=THERMOWORKS_DATA, options=dict(options)),
         ),
         patch.object(flow, "async_show_form", async_show_form),
     ):
@@ -165,3 +184,10 @@ def test_options_flow_clamps_to_shared_bounds() -> None:
 
     assert too_high[CONF_SCAN_INTERVAL] == MAX_SCAN_INTERVAL_SECONDS
     assert too_low[CONF_SCAN_INTERVAL] == MIN_SCAN_INTERVAL_SECONDS
+
+
+def test_options_flow_defaults_to_provider_default() -> None:
+    """The options-flow field starts at the provider's default when no option is saved."""
+    schema = _options_schema({})
+
+    assert schema({})[CONF_SCAN_INTERVAL] == THERMOWORKS_DEFAULT_SCAN_INTERVAL_SECONDS
