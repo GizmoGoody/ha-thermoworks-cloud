@@ -193,19 +193,17 @@ class ThermoworksChannel:
 
     @property
     def entity_name(self) -> str:
-        """Return the name the channel's entities are named after, such as "Sensor 2".
+        """Return the name the channel's entities are named after, such as "Ch2".
 
-        The ThermoWorks app cannot name every channel, so a channel without a label is named
-        after what it is. An RFX MEAT probe's computed channel is the probe's reading (labelled
-        "PROBE" or not at all), and its other channels are the sensors along the probe.
+        The ThermoWorks app cannot name every channel. A channel without a label is named
+        "Ch" and its number, as the app shows it. An RFX MEAT probe's computed channel is the
+        probe's reading (labelled "PROBE" or not at all), so it is named "Probe".
         """
         if self.channel_type == "computed":
             return "Probe"
         if self.label:
             return self.label
-        if self.channel_type == "rfx meat sensor":
-            return f"Sensor {self.number}"
-        return f"Channel {self.number}"
+        return f"Ch{self.number}"
 
 
 @dataclass(frozen=True)

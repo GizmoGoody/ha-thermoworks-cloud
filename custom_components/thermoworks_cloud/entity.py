@@ -16,7 +16,7 @@ Ids are set in these base classes, never by the sub-classes:
 - `unique_id`, `{DOMAIN}-{ha_device_identifier}-{suffix}`: the entity registry's key.
   Changing it orphans the entity, so existing formats can't change.
 - `entity_id`: left to Home Assistant, which builds it from the device name and the entity
-  name when the entity is created, like `sensor.rfx_probe_red_sensor_2_temperature`. Existing
+  name when the entity is created, like `sensor.rfx_probe_red_ch2_temperature`. Existing
   entities keep the id they were created with.
 
 A class whose unique ids were created in another format overrides `_unique_id`.
