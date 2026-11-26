@@ -11,7 +11,6 @@ import logging
 from typing import Any
 
 from homeassistant.components.sensor import (
-    ENTITY_ID_FORMAT,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
@@ -90,7 +89,7 @@ async def async_setup_entry(
         # SENSORS is at the end of the file, after the classes it lists
         for sensor in SENSORS:
             for source in sensor.sources(device):
-                entity = sensor.build(hass, coordinator, source)
+                entity = sensor.build(coordinator, source)
                 if entity is None:
                     _LOGGER.debug("Not creating %s sensor for device %s",
                                   sensor.suffix, device.display_name())
@@ -107,7 +106,6 @@ async def async_setup_entry(
 class DeviceSensor[R](ThermoworksDeviceEntity[R], SensorEntity):
     """Base class for sensors on the device itself."""
 
-    entity_id_format = ENTITY_ID_FORMAT
 
     _attr_has_entity_name = True
 
@@ -242,7 +240,6 @@ class FanSensor[R, D = None](ThermoworksFanEntity[R, D], SensorEntity):
     fan still reports its last state and set temperature, which aren't current.
     """
 
-    entity_id_format = ENTITY_ID_FORMAT
 
     _attr_has_entity_name = True
 
@@ -330,7 +327,6 @@ class ChannelSensor[R, D: ChannelDescription = ChannelDescription](
 ):
     """Base class for thermoworks channel sensors."""
 
-    entity_id_format = ENTITY_ID_FORMAT
 
     # https://developers.home-assistant.io/docs/core/entity/sensor/#available-state-classes
     _attr_state_class = SensorStateClass.MEASUREMENT

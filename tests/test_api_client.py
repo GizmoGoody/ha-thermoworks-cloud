@@ -61,17 +61,17 @@ from tests.api_test_object import (
     ApiTestObject,
 )
 
-TEMPERATURE_ENTITY = "sensor.12_34_56_78_90_ab_ch_1_temperature"
-HIGH_THRESHOLD_ENTITY = "sensor.12_34_56_78_90_ab_ch_1_high_alarm_threshold"
-HIGH_ALARM_ENTITY = "binary_sensor.12_34_56_78_90_ab_ch_1_high_alarm"
-LOW_ALARM_ENTITY = "binary_sensor.12_34_56_78_90_ab_ch_1_low_alarm"
-BATTERY_ENTITY = "sensor.12_34_56_78_90_ab_battery"
-SIGNAL_ENTITY = "sensor.12_34_56_78_90_ab_signal"
+TEMPERATURE_ENTITY = "sensor.kitchen_freezer_temperature"
+HIGH_THRESHOLD_ENTITY = "sensor.kitchen_freezer_high_alarm_threshold"
+HIGH_ALARM_ENTITY = "binary_sensor.kitchen_freezer_high_alarm"
+LOW_ALARM_ENTITY = "binary_sensor.kitchen_freezer_low_alarm"
+BATTERY_ENTITY = "sensor.kitchen_battery"
+SIGNAL_ENTITY = "sensor.kitchen_signal_strength"
 DEVICE_ENTITIES = (
     BATTERY_ENTITY,
     SIGNAL_ENTITY,
-    "sensor.12_34_56_78_90_ab_last_seen",
-    "sensor.12_34_56_78_90_ab_transmit_interval",
+    "sensor.kitchen_last_seen",
+    "sensor.kitchen_transmit_interval",
 )
 
 
@@ -905,7 +905,7 @@ async def test_fan_is_registered_under_its_gateway(
     fan = _registered_device(hass, entry, f"{dr.format_mac(TEST_SERIAL)}-fan")
     assert fan.name == fan_name
     assert fan.via_device_id == gateway.id
-    fan_state = hass.states.get("sensor.12_34_56_78_90_ab_fan_state")
+    fan_state = hass.states.get("sensor.kitchen_fan_state")
     assert fan_state is not None
     assert fan_state.state == "Blowing"
 
@@ -922,7 +922,7 @@ async def test_last_seen_is_reported_in_utc(
     await _set_up(hass, entry)
 
     # Assert
-    state = hass.states.get("sensor.12_34_56_78_90_ab_last_seen")
+    state = hass.states.get("sensor.kitchen_last_seen")
     assert state is not None
     # Home Assistant shows timestamps to the second
     assert dt_util.parse_datetime(state.state) == datetime(
@@ -935,15 +935,15 @@ async def test_last_seen_is_reported_in_utc(
     [
         pytest.param(
             GET_DEVICES_FAN_NO_STATE_RESPONSE,
-            {"binary_sensor.12_34_56_78_90_ab_fan_connected": "on",
-             "sensor.12_34_56_78_90_ab_fan_state": "unknown"},
+            {"binary_sensor.kitchen_fan_connected": "on",
+             "sensor.kitchen_fan_state": "unknown"},
             id="no-fan-state",
         ),
         pytest.param(
             GET_DEVICES_FAN_NO_CONNECTION_RESPONSE,
-            {"binary_sensor.12_34_56_78_90_ab_fan_connected": "unknown",
+            {"binary_sensor.kitchen_fan_connected": "unknown",
              # Not known to be connected, so its values aren't shown as current
-             "sensor.12_34_56_78_90_ab_fan_state": "unavailable"},
+             "sensor.kitchen_fan_state": "unavailable"},
             id="no-fan-connection",
         ),
     ],
@@ -1013,16 +1013,16 @@ async def test_channel_entities_are_named_after_their_channel(
     api_test_object.respond_to_devices(body=GET_DEVICES_NAMING_RESPONSE)
     expected = {
         # A label is used as it is
-        "sensor.12_34_56_78_90_ab_ch_1_temperature": "PORK Shoulder temperature",
-        "sensor.12_34_56_78_90_ab_ch_2_humidity": "dry box humidity",
-        "sensor.12_34_56_78_90_ab_ch_1_high_alarm_threshold":
+        "sensor.kitchen_pork_shoulder_temperature": "PORK Shoulder temperature",
+        "sensor.kitchen_dry_box_humidity": "dry box humidity",
+        "sensor.kitchen_pork_shoulder_high_alarm_threshold":
             "PORK Shoulder high alarm threshold",
-        "binary_sensor.12_34_56_78_90_ab_ch_1_high_alarm": "PORK Shoulder high alarm",
+        "binary_sensor.kitchen_pork_shoulder_high_alarm": "PORK Shoulder high alarm",
         # A missing or empty label falls back to the channel number
-        "sensor.12_34_56_78_90_ab_ch_3_temperature": "Channel 3 temperature",
-        "sensor.12_34_56_78_90_ab_ch_4_temperature": "Channel 4 temperature",
-        "sensor.12_34_56_78_90_ab_ch_3_high_alarm_threshold": "Channel 3 high alarm threshold",
-        "binary_sensor.12_34_56_78_90_ab_ch_4_high_alarm": "Channel 4 high alarm",
+        "sensor.kitchen_channel_3_temperature": "Channel 3 temperature",
+        "sensor.kitchen_channel_4_temperature": "Channel 4 temperature",
+        "sensor.kitchen_channel_3_high_alarm_threshold": "Channel 3 high alarm threshold",
+        "binary_sensor.kitchen_channel_4_high_alarm": "Channel 4 high alarm",
     }
 
     # Act
@@ -1161,13 +1161,13 @@ async def test_fan_shows_its_values_while_connected(
     await _set_up(hass, entry)
 
     # Assert
-    connected = hass.states.get("binary_sensor.12_34_56_78_90_ab_fan_connected")
+    connected = hass.states.get("binary_sensor.kitchen_fan_connected")
     assert connected is not None
     assert connected.state == "on"
-    fan_state = hass.states.get("sensor.12_34_56_78_90_ab_fan_state")
+    fan_state = hass.states.get("sensor.kitchen_fan_state")
     assert fan_state is not None
     assert fan_state.state == "Blowing"
-    set_temperature = hass.states.get("sensor.12_34_56_78_90_ab_fan_set_temperature")
+    set_temperature = hass.states.get("sensor.kitchen_fan_set_temperature")
     assert set_temperature is not None
     assert float(set_temperature.state) == 275
     assert set_temperature.attributes["unit_of_measurement"] == "°F"
@@ -1189,7 +1189,7 @@ async def test_fan_set_temperature_keeps_its_unit_when_the_gateway_stops_reporti
     await _poll(hass)
 
     # Assert
-    set_temperature = hass.states.get("sensor.12_34_56_78_90_ab_fan_set_temperature")
+    set_temperature = hass.states.get("sensor.kitchen_fan_set_temperature")
     assert set_temperature is not None
     assert set_temperature.state == "unavailable"
     assert set_temperature.attributes["unit_of_measurement"] == "°F"
@@ -1209,12 +1209,12 @@ async def test_disconnected_fan_values_are_unavailable(
     await _set_up(hass, entry)
 
     # Assert
-    connected = hass.states.get("binary_sensor.12_34_56_78_90_ab_fan_connected")
+    connected = hass.states.get("binary_sensor.kitchen_fan_connected")
     assert connected is not None
     assert connected.state == "off"
     for entity_id in (
-        "sensor.12_34_56_78_90_ab_fan_state",
-        "sensor.12_34_56_78_90_ab_fan_set_temperature",
+        "sensor.kitchen_fan_state",
+        "sensor.kitchen_fan_set_temperature",
     ):
         state = hass.states.get(entity_id)
         assert state is not None, entity_id
@@ -1236,19 +1236,19 @@ async def test_rfx_meat_channels_are_named_and_unset_alarms_start_disabled(
 
     # Assert
     for entity_id, name in {
-        "sensor.12_34_56_78_90_ab_ch_0_temperature": "RFX Probe Red Probe temperature",
-        "sensor.12_34_56_78_90_ab_ch_2_temperature": "RFX Probe Red Sensor 2 temperature",
-        "binary_sensor.12_34_56_78_90_ab_ch_0_high_alarm": "RFX Probe Red Probe high alarm",
+        "sensor.rfx_probe_red_probe_temperature": "RFX Probe Red Probe temperature",
+        "sensor.rfx_probe_red_sensor_2_temperature": "RFX Probe Red Sensor 2 temperature",
+        "binary_sensor.rfx_probe_red_probe_high_alarm": "RFX Probe Red Probe high alarm",
     }.items():
         state = hass.states.get(entity_id)
         assert state is not None, entity_id
         assert state.attributes["friendly_name"] == name, entity_id
     registry = er.async_get(hass)
     for entity_id, disabled in {
-        "binary_sensor.12_34_56_78_90_ab_ch_0_high_alarm": False,
-        "sensor.12_34_56_78_90_ab_ch_0_low_alarm_threshold": False,
-        "binary_sensor.12_34_56_78_90_ab_ch_2_high_alarm": True,
-        "sensor.12_34_56_78_90_ab_ch_2_low_alarm_threshold": True,
+        "binary_sensor.rfx_probe_red_probe_high_alarm": False,
+        "sensor.rfx_probe_red_probe_low_alarm_threshold": False,
+        "binary_sensor.rfx_probe_red_sensor_2_high_alarm": True,
+        "sensor.rfx_probe_red_sensor_2_low_alarm_threshold": True,
     }.items():
         registry_entry = registry.async_get(entity_id)
         assert registry_entry is not None, entity_id

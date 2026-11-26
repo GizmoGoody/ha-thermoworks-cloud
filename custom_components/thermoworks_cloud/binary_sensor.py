@@ -4,7 +4,6 @@ from abc import abstractmethod
 from dataclasses import dataclass
 
 from homeassistant.components.binary_sensor import (
-    ENTITY_ID_FORMAT,
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
@@ -33,7 +32,7 @@ async def async_setup_entry(
         # BINARY_SENSORS is at the end of the file, after the classes it lists
         for binary_sensor in BINARY_SENSORS:
             for source in binary_sensor.sources(device):
-                entity = binary_sensor.build(hass, coordinator, source)
+                entity = binary_sensor.build(coordinator, source)
                 if entity is not None:
                     new_entities.append(entity)
 
@@ -54,7 +53,6 @@ class FanConnectedSensor(ThermoworksFanEntity[FanConnection], BinarySensorEntity
     showing that is its job.
     """
 
-    entity_id_format = ENTITY_ID_FORMAT
     suffix = "connected"
 
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
@@ -97,7 +95,6 @@ class AlarmBinarySensor(
     valid reading. Without one, the alarm's state is an old evaluation, not a current one.
     """
 
-    entity_id_format = ENTITY_ID_FORMAT
 
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_has_entity_name = True
