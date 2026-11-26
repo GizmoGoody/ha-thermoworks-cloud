@@ -660,6 +660,8 @@ BUDGET_SENSORS: tuple[RequestBudgetSensorDescription, ...] = (
         translation_key="sustainable_interval",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.SECONDS,
+        # Whole seconds, like the scan interval
+        suggested_display_precision=0,
         value_fn=lambda budget, _: budget.sustainable_interval,
     ),
     RequestBudgetSensorDescription(
@@ -673,6 +675,8 @@ BUDGET_SENSORS: tuple[RequestBudgetSensorDescription, ...] = (
         translation_key="recommended_poll_interval",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.SECONDS,
+        # Whole seconds, like the scan interval
+        suggested_display_precision=0,
         entity_registry_enabled_default=False,
         value_fn=_limit(lambda limits: limits.recommended_poll_seconds),
     ),
