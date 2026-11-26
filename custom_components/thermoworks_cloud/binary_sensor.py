@@ -14,8 +14,20 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import ThermoworksCoordinator
-from .entity import ChannelDescription, ThermoworksChannelEntity, ThermoworksFanEntity, View
-from .models import ThermoworksAlarm, ThermoworksChannel, ThermoworksFan, Unit
+from .entity import (
+    ChannelDescription,
+    ThermoworksChannelEntity,
+    ThermoworksDeviceEntity,
+    ThermoworksFanEntity,
+    View,
+)
+from .models import (
+    ThermoworksAlarm,
+    ThermoworksChannel,
+    ThermoworksDevice,
+    ThermoworksFan,
+    Unit,
+)
 
 
 async def async_setup_entry(
@@ -38,6 +50,28 @@ async def async_setup_entry(
                     new_entities.append(entity)
 
     async_add_entities(new_entities)
+
+
+class ChargingSensor(ThermoworksDeviceEntity[bool], BinarySensorEntity):
+    """Whether the device's battery is charging, from the API's `batteryState`.
+
+    Created when the device reports a battery state. Named "Charging" by Home Assistant
+    from the device class.
+    """
+
+    suffix = "charging"
+
+    _attr_device_class = BinarySensorDeviceClass.BATTERY_CHARGING
+    _attr_has_entity_name = True
+
+    @classmethod
+    def parse(cls, device: ThermoworksDevice) -> View[bool, None] | None:
+        if device.battery_state is None:
+            return None
+        return View(entity_state=device.battery_state == "charging", description=None)
+
+    def _apply(self, entity_state: bool) -> None:
+        self._attr_is_on = entity_state
 
 
 @dataclass(frozen=True)
@@ -154,7 +188,8 @@ class LowAlarmBinarySensor(AlarmBinarySensor):
 
 
 # Every binary sensor type. Each is created for the sources on a device that have it.
-BINARY_SENSORS: list[type[FanConnectedSensor | AlarmBinarySensor]] = [
+BINARY_SENSORS: list[type[ChargingSensor | FanConnectedSensor | AlarmBinarySensor]] = [
+    ChargingSensor,
     FanConnectedSensor,
     HighAlarmBinarySensor,
     LowAlarmBinarySensor,
