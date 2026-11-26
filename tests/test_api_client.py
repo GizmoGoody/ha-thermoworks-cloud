@@ -1133,12 +1133,13 @@ async def test_disabled_alarm_is_not_active(
 ) -> None:
     """A disabled alarm isn't a problem, even if the API says it's alarming."""
 
-    # Setup
+    # Setup: the alarm is on when its entity is created, so the entity is enabled
     entry = _api_key_entry(hass)
+    await _set_up(hass, entry)
     api_test_object.respond_to_devices(body=GET_DEVICES_DISABLED_ALARM_RESPONSE)
 
     # Act
-    await _set_up(hass, entry)
+    await _poll(hass)
 
     # Assert
     high_alarm = hass.states.get(HIGH_ALARM_ENTITY)
