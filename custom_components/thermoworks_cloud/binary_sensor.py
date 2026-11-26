@@ -60,6 +60,7 @@ class ChargingSensor(ThermoworksDeviceEntity[bool], BinarySensorEntity):
     """
 
     suffix = "charging"
+    entity_id_format = ENTITY_ID_FORMAT
 
     _attr_device_class = BinarySensorDeviceClass.BATTERY_CHARGING
     _attr_has_entity_name = True
