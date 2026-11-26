@@ -54,6 +54,14 @@
       },
       "low_alarm": {
         "name": "Low Alarm"
+      },
+      "rate_limited": {
+        "name": "Rate limited",
+        "state_attributes": {
+          "retry_after": {
+            "name": "Retry after"
+          }
+        }
       }
     },
     "number": {
@@ -91,6 +99,36 @@
       },
       "low_alarm_threshold": {
         "name": "Low Alarm Threshold"
+      },
+      "requests_today": {
+        "name": "Requests today"
+      },
+      "requests_remaining": {
+        "name": "Requests remaining"
+      },
+      "rate_limit_per_day": {
+        "name": "Rate limit per day"
+      },
+      "requests_reset": {
+        "name": "Requests reset"
+      },
+      "requests_exhausted": {
+        "name": "Requests exhausted"
+      },
+      "sustainable_interval": {
+        "name": "Sustainable interval"
+      },
+      "rate_limit_per_minute": {
+        "name": "Rate limit per minute"
+      },
+      "recommended_poll_interval": {
+        "name": "Recommended poll interval"
+      },
+      "api_tier": {
+        "name": "API tier"
+      },
+      "last_request": {
+        "name": "Last request"
       }
     }
   }

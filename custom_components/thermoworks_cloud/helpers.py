@@ -4,8 +4,21 @@ from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 
-from .const import CLOUD_PROVIDERS, CONF_CLOUD_PROVIDER, PROVIDER_THERMOWORKS
+from .const import CLOUD_PROVIDERS, CONF_CLOUD_PROVIDER, DOMAIN, PROVIDER_THERMOWORKS
+
+
+def service_device_info(config_entry: ConfigEntry) -> DeviceInfo:
+    """Return the service device that stands for the config entry itself.
+
+    Settings and states of the whole config entry, rather than of a thermometer, are on it.
+    """
+    return DeviceInfo(
+        identifiers={(DOMAIN, config_entry.entry_id)},
+        name=config_entry.title,
+        entry_type=DeviceEntryType.SERVICE,
+    )
 
 
 def get_default_scan_interval(config_entry: ConfigEntry) -> int:

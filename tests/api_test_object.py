@@ -14,6 +14,7 @@ TEST_ETAG = 'W/"test-etag"'
 
 GET_ME_RESPONSE: dict[str, Any] = {
     "accountId": TEST_ACCOUNT_ID,
+    "plan": {"id": "default", "apiTier": "free"},
     "rateLimit": {"perMinute": 4, "perDay": 3000},
     "recommendedPollSeconds": 60,
 }
@@ -108,6 +109,7 @@ class ApiTestObject:
         app.router.add_get("/api/v1/me", self._get_me)
         app.router.add_get("/api/v1/devices", self._get_devices)
         self.server = TestServer(app)
+        self.me_requests: list[web.Request] = []
         self.devices_requests: list[web.Request] = []
         self.me_status = 200
         self.devices_status = 200
@@ -131,6 +133,7 @@ class ApiTestObject:
         self.devices_headers = headers or {}
 
     async def _get_me(self, request: web.Request) -> web.Response:
+        self.me_requests.append(request)
         if self.me_status != 200:
             return web.json_response({"error": {"code": "test"}}, status=self.me_status)
         if request.headers.get("Authorization") != f"Bearer {TEST_API_KEY}":
@@ -146,3 +149,56 @@ class ApiTestObject:
         )
 GET_DEVICES_CHARGING_RESPONSE = deepcopy(GET_DEVICES_RESPONSE)
 GET_DEVICES_CHARGING_RESPONSE["devices"][0]["batteryState"] = "charging"
+# The battery reading drops out while other device and channel values keep changing
+GET_DEVICES_NULL_BATTERY_RESPONSE = deepcopy(GET_DEVICES_RESPONSE)
+GET_DEVICES_NULL_BATTERY_RESPONSE["devices"][0].update({"battery": None, "wifiSignal": -70})
+GET_DEVICES_NULL_BATTERY_RESPONSE["devices"][0]["channels"][0]["value"] = 5.0
+GET_DEVICES_NO_DEVICES_RESPONSE = deepcopy(GET_DEVICES_RESPONSE)
+GET_DEVICES_NO_DEVICES_RESPONSE["devices"] = []
+# Fan shape from the library's RFX gateway capture
+GET_DEVICES_FAN_RESPONSE = deepcopy(GET_DEVICES_RESPONSE)
+GET_DEVICES_FAN_RESPONSE["devices"][0]["fan"] = {
+    "connected": True, "channel": "1", "setTemp": 275, "state": 1,
+}
+GET_DEVICES_UNLABELED_FAN_RESPONSE = deepcopy(GET_DEVICES_FAN_RESPONSE)
+GET_DEVICES_UNLABELED_FAN_RESPONSE["devices"][0]["label"] = None
+# The device was renamed in the ThermoWorks app and got a firmware update
+GET_DEVICES_UPDATED_DETAILS_RESPONSE = deepcopy(GET_DEVICES_RESPONSE)
+GET_DEVICES_UPDATED_DETAILS_RESPONSE["devices"][0].update({"label": "Pantry", "firmware": "2.2.0"})
+# A connected fan that doesn't say what it's doing
+GET_DEVICES_FAN_NO_STATE_RESPONSE = deepcopy(GET_DEVICES_FAN_RESPONSE)
+GET_DEVICES_FAN_NO_STATE_RESPONSE["devices"][0]["fan"]["state"] = None
+# A fan that doesn't say whether it's connected
+GET_DEVICES_FAN_NO_CONNECTION_RESPONSE = deepcopy(GET_DEVICES_FAN_RESPONSE)
+GET_DEVICES_FAN_NO_CONNECTION_RESPONSE["devices"][0]["fan"]["connected"] = None
+# Channel labels in different cases, a humidity channel, and missing or empty labels
+GET_DEVICES_NAMING_RESPONSE = deepcopy(GET_DEVICES_RESPONSE)
+_channel = GET_DEVICES_NAMING_RESPONSE["devices"][0]["channels"][0]
+GET_DEVICES_NAMING_RESPONSE["devices"][0]["channels"] = [
+    {**_channel, "number": 1, "id": "1", "label": "PORK Shoulder"},
+    {**_channel, "number": 2, "id": "2", "label": "dry box", "units": "H", "value": 50},
+    {**_channel, "number": 3, "id": "3", "label": None},
+    {**_channel, "number": 4, "id": "4", "label": ""},
+]
+# A device whose id isn't its serial
+GET_DEVICES_DISTINCT_DEVICE_ID_RESPONSE = deepcopy(GET_DEVICES_FAN_RESPONSE)
+GET_DEVICES_DISTINCT_DEVICE_ID_RESPONSE["devices"][0]["id"] = "AABBCCDDEEFF"
+# A device with no id, identified by its serial
+GET_DEVICES_NO_DEVICE_ID_RESPONSE = deepcopy(GET_DEVICES_FAN_RESPONSE)
+GET_DEVICES_NO_DEVICE_ID_RESPONSE["devices"][0]["id"] = None
+# Alarms with units, one going off
+GET_DEVICES_ALARMS_RESPONSE = deepcopy(GET_DEVICES_RESPONSE)
+GET_DEVICES_ALARMS_RESPONSE["devices"][0]["channels"][0].update({
+    "alarmHigh": {"enabled": True, "value": 20, "alarming": False, "units": "F"},
+    "alarmLow": {"enabled": True, "value": -12, "alarming": True, "units": "F"},
+})
+# A disabled alarm still reports alarming
+GET_DEVICES_DISABLED_ALARM_RESPONSE = deepcopy(GET_DEVICES_RESPONSE)
+GET_DEVICES_DISABLED_ALARM_RESPONSE["devices"][0]["channels"][0]["alarmHigh"] = {
+    "enabled": False, "value": 20, "alarming": True, "units": "F",
+}
+# The gateway stops reporting which temperature unit it displays
+GET_DEVICES_FAN_NO_DISPLAY_UNITS_RESPONSE = deepcopy(GET_DEVICES_FAN_RESPONSE)
+GET_DEVICES_FAN_NO_DISPLAY_UNITS_RESPONSE["devices"][0]["displayUnits"] = None
+GET_DEVICES_FAN_DISCONNECTED_RESPONSE = deepcopy(GET_DEVICES_FAN_RESPONSE)
+GET_DEVICES_FAN_DISCONNECTED_RESPONSE["devices"][0]["fan"]["connected"] = False
