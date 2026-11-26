@@ -9,11 +9,14 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .budget import RequestBudget
 from .const import DOMAIN
 from .coordinator import ThermoworksCoordinator
+from .helpers import service_device_info
 from .entity import ChannelDescription, ThermoworksChannelEntity, ThermoworksFanEntity, View
 from .models import ThermoworksAlarm, ThermoworksChannel, ThermoworksFan, Unit
 
@@ -37,7 +40,44 @@ async def async_setup_entry(
                 if entity is not None:
                     new_entities.append(entity)
 
+    if coordinator.budget is not None:
+        new_entities.append(RateLimitedSensor(config_entry, coordinator.budget))
+
     async_add_entities(new_entities)
+
+
+class RateLimitedSensor(BinarySensorEntity):
+    """Whether ThermoWorks answered the latest request with "rate limited".
+
+    On the config entry's service device. It reads the request budget rather than the latest
+    poll, so it stays available while the key is rate limited.
+    """
+
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_translation_key = "rate_limited"
+
+    def __init__(self, config_entry: ConfigEntry, budget: RequestBudget) -> None:
+        """Initialise the sensor."""
+        self._budget = budget
+        self._attr_unique_id = f"{config_entry.entry_id}_rate_limited"
+        self._attr_device_info = service_device_info(config_entry)
+
+    async def async_added_to_hass(self) -> None:
+        """Update whenever the budget changes."""
+        self.async_on_remove(self._budget.async_add_listener(self.async_write_ha_state))
+
+    @property
+    def is_on(self) -> bool:
+        """Return whether the latest request was rate limited."""
+        return self._budget.rate_limited
+
+    @property
+    def extra_state_attributes(self) -> dict[str, int | None]:
+        """Return how long ThermoWorks asked to wait, in seconds."""
+        return {"retry_after": self._budget.retry_after}
 
 
 @dataclass(frozen=True)

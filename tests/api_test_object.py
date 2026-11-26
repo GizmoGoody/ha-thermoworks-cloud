@@ -14,6 +14,7 @@ TEST_ETAG = 'W/"test-etag"'
 
 GET_ME_RESPONSE: dict[str, Any] = {
     "accountId": TEST_ACCOUNT_ID,
+    "plan": {"id": "default", "apiTier": "free"},
     "rateLimit": {"perMinute": 4, "perDay": 3000},
     "recommendedPollSeconds": 60,
 }
@@ -108,6 +109,7 @@ class ApiTestObject:
         app.router.add_get("/api/v1/me", self._get_me)
         app.router.add_get("/api/v1/devices", self._get_devices)
         self.server = TestServer(app)
+        self.me_requests: list[web.Request] = []
         self.devices_requests: list[web.Request] = []
         self.me_status = 200
         self.devices_status = 200
@@ -131,6 +133,7 @@ class ApiTestObject:
         self.devices_headers = headers or {}
 
     async def _get_me(self, request: web.Request) -> web.Response:
+        self.me_requests.append(request)
         if self.me_status != 200:
             return web.json_response({"error": {"code": "test"}}, status=self.me_status)
         if request.headers.get("Authorization") != f"Bearer {TEST_API_KEY}":

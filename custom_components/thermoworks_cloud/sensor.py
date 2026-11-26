@@ -5,6 +5,7 @@ and the base classes in `entity.py` handle identity, updates and availability th
 for all of them.
 """
 from abc import abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 import logging
@@ -14,15 +15,25 @@ from homeassistant.components.sensor import (
     ENTITY_ID_FORMAT,
     SensorDeviceClass,
     SensorEntity,
+    SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, SIGNAL_STRENGTH_DECIBELS_MILLIWATT, UnitOfTemperature, UnitOfTime
+from homeassistant.const import (
+    PERCENTAGE,
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    EntityCategory,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import StateType
 
+from .budget import Limits, RequestBudget
 from .const import DOMAIN
 from .coordinator import ThermoworksCoordinator
+from .helpers import service_device_info
 from .entity import (
     ChannelDescription,
     ThermoworksChannelEntity,
@@ -96,6 +107,14 @@ async def async_setup_entry(
                                   sensor.suffix, device.display_name())
                     continue
                 new_entities.append(entity)
+
+    if coordinator.budget is not None:
+        new_entities.extend(
+            RequestBudgetSensor(
+                config_entry, coordinator.budget, coordinator.poll_interval, description
+            )
+            for description in BUDGET_SENSORS
+        )
 
     if len(new_entities) > 0:
         _LOGGER.debug("New entities to create: %d", len(new_entities))
@@ -550,3 +569,124 @@ SENSORS: list[type[DeviceSensor[Any] | FanSensor[Any, Any] | ChannelSensor[Any, 
     HighAlarmThresholdSensor,
     LowAlarmThresholdSensor,
 ]
+
+
+@dataclass(frozen=True, kw_only=True)
+class RequestBudgetSensorDescription(SensorEntityDescription):
+    """Describes a sensor for the API key's request budget."""
+
+    # Reads the value from the budget and the config entry's scan interval
+    value_fn: Callable[[RequestBudget, int], StateType | datetime]
+
+
+class RequestBudgetSensor(SensorEntity):
+    """Part of the API key's request budget, on the config entry's service device.
+
+    These read the budget rather than the latest poll, so they stay available while polling
+    fails, including while the key is rate limited.
+    """
+
+    entity_description: RequestBudgetSensorDescription
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(
+        self,
+        config_entry: ConfigEntry,
+        budget: RequestBudget,
+        scan_interval: int,
+        description: RequestBudgetSensorDescription,
+    ) -> None:
+        """Initialise the sensor."""
+        self.entity_description = description
+        self._budget = budget
+        self._scan_interval = scan_interval
+        self._attr_unique_id = f"{config_entry.entry_id}_{description.key}"
+        self._attr_device_info = service_device_info(config_entry)
+
+    async def async_added_to_hass(self) -> None:
+        """Update whenever the budget changes."""
+        self.async_on_remove(self._budget.async_add_listener(self.async_write_ha_state))
+
+    @property
+    def native_value(self) -> StateType | datetime:
+        """Return the value from the budget."""
+        return self.entity_description.value_fn(self._budget, self._scan_interval)
+
+
+def _limit(
+    read: Callable[[Limits], StateType],
+) -> Callable[[RequestBudget, int], StateType]:
+    """Return a value_fn reading one of the key's limits, or None while they are unknown."""
+    return lambda budget, _: read(budget.limits) if budget.limits is not None else None
+
+
+# The request budget sensors, created for ThermoWorks API keys only
+BUDGET_SENSORS: tuple[RequestBudgetSensorDescription, ...] = (
+    RequestBudgetSensorDescription(
+        key="requests_today",
+        translation_key="requests_today",
+        # Starts again from zero at midnight UTC, which statistics treat as a reset
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda budget, _: budget.requests_today,
+    ),
+    RequestBudgetSensorDescription(
+        key="requests_remaining",
+        translation_key="requests_remaining",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda budget, _: budget.requests_remaining,
+    ),
+    RequestBudgetSensorDescription(
+        key="rate_limit_per_day",
+        translation_key="rate_limit_per_day",
+        value_fn=_limit(lambda limits: limits.per_day),
+    ),
+    RequestBudgetSensorDescription(
+        key="requests_reset",
+        translation_key="requests_reset",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda budget, _: budget.reset,
+    ),
+    RequestBudgetSensorDescription(
+        key="requests_exhausted",
+        translation_key="requests_exhausted",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda budget, scan_interval: budget.exhausted(scan_interval),
+    ),
+    RequestBudgetSensorDescription(
+        key="sustainable_interval",
+        translation_key="sustainable_interval",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda budget, _: budget.sustainable_interval,
+    ),
+    RequestBudgetSensorDescription(
+        key="rate_limit_per_minute",
+        translation_key="rate_limit_per_minute",
+        entity_registry_enabled_default=False,
+        value_fn=_limit(lambda limits: limits.per_minute),
+    ),
+    RequestBudgetSensorDescription(
+        key="recommended_poll_interval",
+        translation_key="recommended_poll_interval",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        entity_registry_enabled_default=False,
+        value_fn=_limit(lambda limits: limits.recommended_poll_seconds),
+    ),
+    RequestBudgetSensorDescription(
+        key="api_tier",
+        translation_key="api_tier",
+        entity_registry_enabled_default=False,
+        value_fn=_limit(lambda limits: limits.api_tier),
+    ),
+    RequestBudgetSensorDescription(
+        key="last_request",
+        translation_key="last_request",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_registry_enabled_default=False,
+        value_fn=lambda budget, _: budget.last_request,
+    ),
+)

@@ -28,6 +28,7 @@ from .const import (
     DOMAIN,
     PROVIDER_THERMOWORKS,
 )
+from .budget import RequestBudget
 from .exceptions import MissingRequiredAttributeError
 from .helpers import get_scan_interval
 from .models import ThermoworksDevice
@@ -101,10 +102,14 @@ class ThermoworksCoordinator(DataUpdateCoordinator[ThermoworksData]):
         )
         client_session = async_get_clientsession(hass)
         self.client: ThermoworksClient | None = None
+        # Only ThermoWorks API keys have a request budget to track
+        self.budget: RequestBudget | None = None
         if self.provider == PROVIDER_THERMOWORKS and config_entry.data.get(CONF_API_KEY):
+            self.budget = RequestBudget(hass, config_entry)
             self.client = ThermoworksClient(
                 client_session, config_entry.data[CONF_API_KEY],
                 base_url=CLOUD_PROVIDERS[self.provider]["base_url"],
+                on_response=self.budget.record_response,
             )
             self.auth_factory = None
         else:
@@ -116,6 +121,27 @@ class ThermoworksCoordinator(DataUpdateCoordinator[ThermoworksData]):
                 referer=provider_config["referer"],
             )
         self.api = None
+
+    async def _async_setup(self) -> None:
+        """Load the request budget, and read the key's limits once a day.
+
+        Reading the limits is a request, so it is not repeated on every reload. If it fails,
+        polling still starts and the limits stay unknown until the next setup.
+        """
+        if self.budget is None or self.client is None:
+            return
+        await self.budget.async_load()
+        if self.budget.limits_current:
+            return
+        try:
+            self.budget.set_account(await self.client.get_me())
+        except ApiAuthenticationError as err:
+            raise ConfigEntryAuthFailed("ThermoWorks API key was rejected") from err
+        except RateLimitError as err:
+            self.budget.set_retry_after(err.retry_after)
+            _LOGGER.warning("Could not read the API key's limits: %s", err)
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            _LOGGER.warning("Could not read the API key's limits: %s", err)
 
     async def async_update_data(self) -> ThermoworksData:
         """Fetch data from the API and parse it.
@@ -208,6 +234,8 @@ class ThermoworksCoordinator(DataUpdateCoordinator[ThermoworksData]):
         except ApiAuthenticationError as err:
             raise ConfigEntryAuthFailed("ThermoWorks API key was rejected") from err
         except RateLimitError as err:
+            if self.budget is not None:
+                self.budget.set_retry_after(err.retry_after)
             raise UpdateFailed(
                 f"Error communicating with API: {err}", retry_after=err.retry_after
             ) from err

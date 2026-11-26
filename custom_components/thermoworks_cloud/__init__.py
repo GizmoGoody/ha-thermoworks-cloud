@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntry
 
+from .budget import RequestBudget
 from .const import DOMAIN
 from .coordinator import ThermoworksCoordinator
 
@@ -38,7 +39,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Perform an initial data load from api.
     # async_config_entry_first_refresh() is special in that it does not log errors if it fails
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except Exception:
+        # Setup is retried with a new coordinator, which continues from the saved count
+        if coordinator.budget is not None:
+            await coordinator.budget.async_unload()
+        raise
 
     # Register devices now, so they exist with their details before entities attach to
     # them, then again after every refresh to keep the details current
@@ -133,6 +140,10 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     # Remove the config options update listener
     hass.data[DOMAIN][config_entry.entry_id].cancel_update_listener()
 
+    # Save the request count now, so the next setup of this entry continues from it
+    if (budget := hass.data[DOMAIN][config_entry.entry_id].coordinator.budget) is not None:
+        await budget.async_unload()
+
     # Unload platforms
     unload_ok = await hass.config_entries.async_unload_platforms(
         config_entry, PLATFORMS
@@ -144,3 +155,8 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
 
     # Return that unloading was successful.
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Delete the saved request count of a deleted config entry."""
+    await RequestBudget(hass, entry).async_remove()

@@ -14,7 +14,7 @@
     "thermoworks_cloud"
   ],
   "requirements": [
-    "thermoworks_cloud==2.0.1"
+    "thermoworks_cloud @ https://github.com/GizmoGoody/python-thermoworks-cloud/releases/download/v2.1.0.dev1/thermoworks_cloud-2.1.0.dev1-py3-none-any.whl"
   ],
   "single_config_entry": false,
   "ssdp": [],

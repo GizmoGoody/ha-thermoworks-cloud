@@ -38,15 +38,13 @@ from homeassistant.components.number import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL, EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
-    DOMAIN,
     MAX_SCAN_INTERVAL_SECONDS,
     MIN_SCAN_INTERVAL_SECONDS,
 )
-from .helpers import get_scan_interval
+from .helpers import get_scan_interval, service_device_info
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
@@ -89,11 +87,7 @@ class ScanIntervalNumber(NumberEntity):
         """Initialise the entity for the given config entry."""
         self._config_entry = config_entry
         self._attr_unique_id = f"{config_entry.entry_id}_scan_interval"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, config_entry.entry_id)},
-            name=config_entry.title,
-            entry_type=DeviceEntryType.SERVICE,
-        )
+        self._attr_device_info = service_device_info(config_entry)
 
     @property
     def native_value(self) -> int:
