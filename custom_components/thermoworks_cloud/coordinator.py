@@ -6,7 +6,7 @@ from datetime import timedelta
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, CONF_SCAN_INTERVAL
+from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -25,11 +25,11 @@ from .const import (
     CLOUD_PROVIDERS,
     CONF_API_KEY,
     CONF_CLOUD_PROVIDER,
-    DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     PROVIDER_THERMOWORKS,
 )
 from .exceptions import MissingRequiredAttributeError
+from .helpers import get_scan_interval
 from .models import ThermoworksDevice
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
@@ -86,10 +86,8 @@ class ThermoworksCoordinator(DataUpdateCoordinator[ThermoworksData]):
         self.password = config_entry.data.get(CONF_PASSWORD)
         self.provider = config_entry.data.get(CONF_CLOUD_PROVIDER, PROVIDER_THERMOWORKS)
 
-        # set variables from options.  You need a default here incase options have not been set
-        self.poll_interval = config_entry.options.get(
-            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
-        )
+        # The scan interval option, or the provider's default when it has not been set
+        self.poll_interval = get_scan_interval(config_entry)
 
         # Initialise DataUpdateCoordinator
         super().__init__(

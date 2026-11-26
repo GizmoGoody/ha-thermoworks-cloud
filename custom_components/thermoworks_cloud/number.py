@@ -42,11 +42,11 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
-    DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     MAX_SCAN_INTERVAL_SECONDS,
     MIN_SCAN_INTERVAL_SECONDS,
 )
+from .helpers import get_scan_interval
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
@@ -98,9 +98,7 @@ class ScanIntervalNumber(NumberEntity):
     @property
     def native_value(self) -> int:
         """Return the current scan interval in seconds from the options store."""
-        return self._config_entry.options.get(
-            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
-        )
+        return get_scan_interval(self._config_entry)
 
     async def async_set_native_value(self, value: float) -> None:
         """Persist a new scan interval on the config entry.
