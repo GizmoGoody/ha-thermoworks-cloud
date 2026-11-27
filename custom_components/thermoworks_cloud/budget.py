@@ -20,7 +20,7 @@ import math
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_point_in_utc_time
+from homeassistant.helpers.event import async_call_later, async_track_point_in_utc_time
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 from thermoworks_cloud.models import Account
@@ -28,8 +28,10 @@ from thermoworks_cloud.models import Account
 from .const import DOMAIN, MAX_SCAN_INTERVAL_SECONDS, MIN_SCAN_INTERVAL_SECONDS
 
 STORAGE_VERSION = 1
-# Saving after every request would write to disk every few seconds. Unload and shutdown save
-# straight away, so only a crash loses the requests of the last minute.
+# Saving after every request would write to disk every few seconds, so a change is saved at
+# most this long after it. Unload and shutdown save straight away, so only a crash loses the
+# requests of the last minute. Store.async_delay_save is not used for the delay: each call
+# moves its write later, so with a poll more often than the delay it would never write.
 SAVE_DELAY_SECONDS = 60
 
 
@@ -66,6 +68,7 @@ class RequestBudget:
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, storage_key(api_key))
         self._listeners: list[CALLBACK_TYPE] = []
         self._cancel_reset: CALLBACK_TYPE | None = None
+        self._cancel_save: CALLBACK_TYPE | None = None
         # Nothing is saved before the saved count is loaded, so it is never overwritten
         self._loaded = False
         self._day: date = dt_util.utcnow().date()
@@ -175,6 +178,9 @@ class RequestBudget:
         if self._cancel_reset is not None:
             self._cancel_reset()
             self._cancel_reset = None
+        if self._cancel_save is not None:
+            self._cancel_save()
+            self._cancel_save = None
         if self._loaded:
             await self._store.async_save(self._data_to_save())
 
@@ -199,10 +205,19 @@ class RequestBudget:
 
     @callback
     def _changed(self) -> None:
-        if self._loaded:
-            self._store.async_delay_save(self._data_to_save, SAVE_DELAY_SECONDS)
+        if self._loaded and self._cancel_save is None:
+            self._cancel_save = async_call_later(
+                self._hass, SAVE_DELAY_SECONDS, self._async_save_later
+            )
         for update_callback in list(self._listeners):
             update_callback()
+
+    @callback
+    def _async_save_later(self, _now: datetime) -> None:
+        """Save the changes made since the timer started."""
+        self._cancel_save = None
+        # Without a delay, Store writes now, and also on shutdown if that comes first
+        self._store.async_delay_save(self._data_to_save)
 
     def _data_to_save(self) -> dict[str, Any]:
         return {
