@@ -13,6 +13,7 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
+from custom_components.thermoworks_cloud.budget import storage_key
 from custom_components.thermoworks_cloud.const import (
     CONF_API_KEY,
     CONF_CLOUD_PROVIDER,
@@ -151,6 +152,32 @@ async def test_count_continues_after_reload_without_reading_limits_again(
     assert _state(hass, RATE_LIMIT_PER_DAY) == "3000"
 
 
+async def test_count_continues_when_the_same_key_is_added_again(
+    hass: HomeAssistant,
+    api_test_object: ApiTestObject,
+    freezer: FrozenDateTimeFactory,
+    hass_storage: dict,
+) -> None:
+    """Test that the count belongs to the key, so deleting and adding the entry keeps it."""
+
+    # Setup: get_me and the first poll
+    freezer.move_to(NOON)
+    entry = _api_key_entry(hass)
+    await _set_up(hass, entry)
+    assert _state(hass, REQUESTS_TODAY) == "2"
+
+    # Act: delete the entry, then add the same key again the same day
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    assert TEST_API_KEY not in str(hass_storage)
+    entry = _api_key_entry(hass)
+    await _set_up(hass, entry)
+
+    # Assert: the limits are still current, so only the first poll is added
+    assert _state(hass, REQUESTS_TODAY) == "3"
+    assert len(api_test_object.me_requests) == 1
+
+
 async def test_limits_read_again_on_a_new_day(
     hass: HomeAssistant, api_test_object: ApiTestObject, freezer: FrozenDateTimeFactory
 ) -> None:
@@ -237,10 +264,10 @@ async def test_sustainable_interval(
     # Setup: the count saved earlier today, less the two requests setup makes
     freezer.move_to(NOON)
     entry = _api_key_entry(hass)
-    hass_storage[f"{DOMAIN}.{entry.entry_id}.requests"] = {
+    hass_storage[storage_key(TEST_API_KEY)] = {
         "version": 1,
         "minor_version": 1,
-        "key": f"{DOMAIN}.{entry.entry_id}.requests",
+        "key": storage_key(TEST_API_KEY),
         "data": {
             "day": NOON.date().isoformat(),
             "requests_today": requests_used - 1,

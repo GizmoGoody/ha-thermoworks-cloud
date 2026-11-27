@@ -1,21 +1,24 @@
-"""Tracks how much of a ThermoWorks API key's daily request budget this config entry uses.
+"""Tracks how much of a ThermoWorks API key's daily request budget the integration uses.
 
 The API reports only the per-minute budget, in the `X-RateLimit-*` headers, and nothing about
 the daily one. So the integration counts every response it gets for the key, saves the count so
 it survives restarts and reloads, and starts again at midnight UTC, when ThermoWorks resets it.
 Every response counts toward the daily limit, including `304 Not Modified`. Requests from
 anything else that uses the same key are not seen.
+
+ThermoWorks counts requests per key, so the count is saved per key rather than per config
+entry. Deleting an entry and adding the same key again the same day continues the count.
 """
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 import math
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.storage import Store
@@ -40,6 +43,14 @@ class Limits:
     api_tier: str | None
 
 
+def storage_key(api_key: str) -> str:
+    """Return the storage key for an API key's count.
+
+    Named after a hash of the key, so the key itself is never written to the file name.
+    """
+    return f"{DOMAIN}.requests.{hashlib.sha256(api_key.encode()).hexdigest()[:16]}"
+
+
 def next_reset(now: datetime) -> datetime:
     """Return the next midnight UTC after `now`, when ThermoWorks resets the daily count."""
     today = dt_util.as_utc(now).date()
@@ -47,14 +58,12 @@ def next_reset(now: datetime) -> datetime:
 
 
 class RequestBudget:
-    """Counts this config entry's requests against its key's daily limit."""
+    """Counts the requests made with an API key against its daily limit."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant, api_key: str) -> None:
         """Create the budget. Call `async_load` before the first request."""
         self._hass = hass
-        self._store: Store[dict[str, Any]] = Store(
-            hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}.requests"
-        )
+        self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, storage_key(api_key))
         self._listeners: list[CALLBACK_TYPE] = []
         self._cancel_reset: CALLBACK_TYPE | None = None
         # Nothing is saved before the saved count is loaded, so it is never overwritten
@@ -168,10 +177,6 @@ class RequestBudget:
             self._cancel_reset = None
         if self._loaded:
             await self._store.async_save(self._data_to_save())
-
-    async def async_remove(self) -> None:
-        """Delete the saved count, when the config entry is deleted."""
-        await self._store.async_remove()
 
     def _roll_over(self, now: datetime) -> None:
         """Start a new count when a new UTC day has begun."""
