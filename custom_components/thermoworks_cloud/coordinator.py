@@ -105,7 +105,7 @@ class ThermoworksCoordinator(DataUpdateCoordinator[ThermoworksData]):
         # Only ThermoWorks API keys have a request budget to track
         self.budget: RequestBudget | None = None
         if self.provider == PROVIDER_THERMOWORKS and config_entry.data.get(CONF_API_KEY):
-            self.budget = RequestBudget(hass, config_entry)
+            self.budget = RequestBudget(hass, config_entry.data[CONF_API_KEY])
             self.client = ThermoworksClient(
                 client_session, config_entry.data[CONF_API_KEY],
                 base_url=CLOUD_PROVIDERS[self.provider]["base_url"],

@@ -11,7 +11,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceEntry
 
-from .budget import RequestBudget
 from .const import DOMAIN
 from .coordinator import ThermoworksCoordinator
 
@@ -140,7 +139,7 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     # Remove the config options update listener
     hass.data[DOMAIN][config_entry.entry_id].cancel_update_listener()
 
-    # Save the request count now, so the next setup of this entry continues from it
+    # Save the request count now, so the next setup with this key continues from it
     if (budget := hass.data[DOMAIN][config_entry.entry_id].coordinator.budget) is not None:
         await budget.async_unload()
 
@@ -155,8 +154,3 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
 
     # Return that unloading was successful.
     return unload_ok
-
-
-async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Delete the saved request count of a deleted config entry."""
-    await RequestBudget(hass, entry).async_remove()
