@@ -152,6 +152,28 @@ async def test_count_continues_after_reload_without_reading_limits_again(
     assert _state(hass, RATE_LIMIT_PER_DAY) == "3000"
 
 
+async def test_count_is_saved_while_polling(
+    hass: HomeAssistant,
+    api_test_object: ApiTestObject,
+    freezer: FrozenDateTimeFactory,
+    hass_storage: dict,
+) -> None:
+    """Test that the count is written within a minute, even with a poll every 30 seconds."""
+
+    # Setup: get_me and the first poll
+    freezer.move_to(NOON)
+    entry = _api_key_entry(hass)
+    await _set_up(hass, entry)
+
+    # Act: poll for two minutes
+    for _ in range(4):
+        await _poll(hass, freezer)
+
+    # Assert: a save has happened, with a count from the last minute
+    saved = hass_storage[storage_key(TEST_API_KEY)]["data"]
+    assert saved["requests_today"] >= 4
+
+
 async def test_count_continues_when_the_same_key_is_added_again(
     hass: HomeAssistant,
     api_test_object: ApiTestObject,
